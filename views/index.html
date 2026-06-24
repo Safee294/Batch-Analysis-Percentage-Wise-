@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grade Analysis</title>
+    <script src="app.js"></script>
+    <style>
+        body {
+            background: #37353e;
+            color: #d3dad9;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        h1, h2, h3 {
+            color: #d3dad9;
+            margin-bottom: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        h1 {
+            text-align: center;
+            margin-top: 32px;
+            margin-bottom: 32px;
+            font-size: 2.2rem;
+        }
+        h2 {
+            font-size: 1.3rem;
+        }
+        h3 {
+            font-size: 1.1rem;
+        }
+        .container {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            align-items: flex-start;
+            padding: 0 32px 32px 32px;
+        }
+        .card {
+            background: #44444e;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(55,53,62,0.10);
+            padding: 24px;
+            margin-bottom: 24px;
+            min-width: 320px;
+        }
+        table {
+            border-collapse: collapse;
+            background: #44444e;
+            color: #d3dad9;
+            width: 100%;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(55,53,62,0.08);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th, td {
+            border: 1px solid #715a5a;
+            padding: 10px 16px;
+            text-align: left;
+        }
+        th {
+            background: #715a5a;
+            color: #d3dad9;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background: #37353e;
+        }
+        a {
+            color: #d3dad9;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        a:hover, a:focus {
+            color: #d3dad9;
+            text-decoration: underline;
+        }
+        a:visited {
+            color: #d3dad9;
+        }
+        #batch-stats, #grade-dist {
+            margin-top: 20px;
+        }
+        #batch-stats table, #grade-dist table {
+            margin-bottom: 0;
+        }
+        .filter-row {
+            margin-bottom: 16px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        label {
+            font-weight: 600;
+            margin-right: 8px;
+        }
+        select {
+            background: #44444e;
+            color: #d3dad9;
+            border: 1px solid #715a5a;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 1rem;
+        }
+        @media (max-width: 900px) {
+            .container {
+                flex-direction: column;
+                gap: 0;
+                padding: 0 8px 24px 8px;
+            }
+            .card {
+                min-width: unset;
+                width: 100%;
+                margin-bottom: 16px;
+            }
+            .filter-row {
+                flex-direction: column;
+                gap: 8px;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Batch-wise Grade Analysis</h1>
+    <div class="container">
+        <div class="card">
+            <h2>Batches</h2>
+            <div class="filter-row">
+                <label for="session-filter">Session:</label>
+                <select id="session-filter">
+                    <option value="All">All</option>
+                    <option value="Spring">Spring</option>
+                    <option value="Fall">Fall</option>
+                    <!-- Add more sessions if needed -->
+                </select>
+                <label for="year-filter">Year:</label>
+                <select id="year-filter">
+                    <option value="All">All</option>
+                    <!-- Years will be populated dynamically -->
+                </select>
+            </div>
+            <table id="batches-table">
+                <tr>
+                    <th>Batch Id</th>
+                    <th>Session</th>
+                    <th>Year</th>
+                    <th>Class</th>
+                </tr>
+            </table>
+        </div>
+        <div class="card">
+            <h2>Students in Batch</h2>
+            <table id="students-table">
+                <tr>
+                    <th>Reg No</th>
+                    <th>Name</th>
+                    <th>Percentage</th>
+                    <th>Grade</th>
+                </tr>
+            </table>
+            <div id="batch-stats"></div>
+            <div id="grade-dist"></div>
+        </div>
+    </div>
+    <script>
+        // Initialize App
+        const app = App();
+
+        // Helper to get unique years from batches
+        function getUniqueYears() {
+            const years = app.batches.map(batch => batch.year);
+            return [...new Set(years)].sort();
+        }
+
+        // Populate year dropdown after batches are loaded
+        function populateYearDropdown() {
+            const yearSelect = document.getElementById('year-filter');
+            // Remove old options except "All"
+            yearSelect.querySelectorAll('option:not([value="All"])').forEach(opt => opt.remove());
+            getUniqueYears().forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            });
+        }
+
+        // Helper to render batches table with session and year filter
+        function renderBatches(session = "All", year = "All") {
+            const table = document.getElementById('batches-table');
+            // Remove old rows except header
+            table.querySelectorAll('tr:not(:first-child)').forEach(tr => tr.remove());
+            app.batches
+                .filter(batch =>
+                    (session === "All" || batch.semester === session) &&
+                    (year === "All" || String(batch.year) === String(year))
+                )
+                .forEach(batch => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${batch.rid}</td>
+                        <td><a href="#" data-batch="${batch.rid}">${batch.semester} ${batch.year}</a></td>
+                        <td>${batch.year}</td>
+                        <td>${batch.class}</td>
+                    `;
+                    table.appendChild(tr);
+                });
+
+            // Add click listeners
+            document.querySelectorAll('a[data-batch]').forEach(link => {
+                link.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    const batchId = link.getAttribute('data-batch');
+                    await app.loadBatchDetails(batchId);
+                    renderStudents(batchId);
+                    renderStats(batchId);
+                    renderGradeDist(batchId);
+                });
+            });
+        }
+
+        // Render batches table and populate year dropdown on load
+        app.getBatches().then(() => {
+            populateYearDropdown();
+            renderBatches();
+        });
+
+        // Add event listeners for session and year dropdowns
+        document.getElementById('session-filter').addEventListener('change', function() {
+            const session = this.value;
+            const year = document.getElementById('year-filter').value;
+            renderBatches(session, year);
+        });
+        document.getElementById('year-filter').addEventListener('change', function() {
+            const year = this.value;
+            const session = document.getElementById('session-filter').value;
+            renderBatches(session, year);
+        });
+
+        // Render students table
+        function renderStudents(batchId) {
+            const table = document.getElementById('students-table');
+            // Remove old rows except header
+            table.querySelectorAll('tr:not(:first-child)').forEach(tr => tr.remove());
+            app.students.forEach(student => {
+                const data = app.batchPercentages[batchId]?.studentPercentages[student.regno] || {percentage: 0, grade: 'F'};
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${student.regno}</td>
+                    <td>${student.name}</td>
+                    <td>${data.percentage.toFixed(2)}%</td>
+                    <td>${data.grade}</td>
+                `;
+                table.appendChild(tr);
+            });
+        }
+
+        // Render batch statistics
+        function renderStats(batchId) {
+            const stats = app.batchPercentages[batchId] || {};
+            document.getElementById('batch-stats').innerHTML = `
+                <h3>Batch Statistics</h3>
+                <table>
+                    <tr><th>Average %</th><td>${stats.average?.toFixed(2) || '0.00'}</td></tr>
+                    <tr><th>Highest %</th><td>${stats.highest?.toFixed(2) || '0.00'}</td></tr>
+                    <tr><th>Lowest %</th><td>${stats.lowest?.toFixed(2) || '0.00'}</td></tr>
+                </table>
+            `;
+        }
+
+        // Render grade distribution
+        function renderGradeDist(batchId) {
+            const dist = app.gradeDistribution[batchId] || {A:0,B:0,C:0,D:0,F:0};
+            document.getElementById('grade-dist').innerHTML = `
+                <h3>Grade Distribution</h3>
+                <table>
+                    <tr>
+                        <th>A</th><th>B</th><th>C</th><th>D</th><th>F</th>
+                    </tr>
+                    <tr>
+                        <td>${dist.A}</td>
+                        <td>${dist.B}</td>
+                        <td>${dist.C}</td>
+                        <td>${dist.D}</td>
+                        <td>${dist.F}</td>
+                    </tr>
+                </table>
+            `;
+        }
+    </script>
+</body>
+</html>
